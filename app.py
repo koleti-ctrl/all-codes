@@ -106,7 +106,6 @@ def translate_output(text, lang):
 # Sidebar filters
 # ===============================
 st.sidebar.header("🧑 Your Profile")
-
 language = st.sidebar.radio("🌐 Choose Language:", ["English", "Hindi", "Telugu"])
 
 education_input = st.sidebar.text_input(translate_ui("🎓 Your Education (optional)", language))
@@ -144,32 +143,51 @@ mode_input = st.sidebar.selectbox(
 mode = translate_to_english(mode_input, language)
 
 # ===============================
-# Recommendation function
+# Weighted Recommendation function
 # ===============================
-def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
+def recommend_internships(user_skills, education, sector, state, district, mode, top_n=5):
     df_copy = df.copy()
 
-    if sector != "Any":
-        df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
-    if state != "Any":
-        df_copy = df_copy[df_copy["State"].str.contains(state, case=False, na=False)]
-    if district != "Any":
-        df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
     if mode != "Any":
         df_copy = df_copy[df_copy["Internship Mode"].str.contains(mode, case=False, na=False)]
-
     if df_copy.empty:
         return pd.DataFrame()
 
+    # Skill similarity
+    skill_score = pd.Series([0]*len(df_copy), index=df_copy.index)
     if user_skills.strip():
         vectorizer = TfidfVectorizer()
         skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
         user_vector = vectorizer.transform([user_skills])
         similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
-        df_copy["Match Score"] = similarity_scores
-        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities Count"], ascending=False)
-    else:
-        df_copy = df_copy.sort_values(by="Opportunities Count", ascending=False)
+        skill_score = pd.Series(similarity_scores, index=df_copy.index)
+
+    # Education match
+    edu_score = pd.Series([0]*len(df_copy), index=df_copy.index)
+    if education.strip() and "Education Requirement" in df_copy.columns:
+        edu_score = df_copy["Education Requirement"].fillna("").apply(
+            lambda x: 1 if education.lower() in x.lower() else 0
+        )
+
+    # Sector / State / District match
+    sector_score = pd.Series([0]*len(df_copy), index=df_copy.index)
+    if sector != "Any":
+        sector_score = df_copy["Sector/Industry"].fillna("").apply(lambda x: 1 if sector.lower() in x.lower() else 0)
+    state_score = pd.Series([0]*len(df_copy), index=df_copy.index)
+    if state != "Any":
+        state_score = df_copy["State"].fillna("").apply(lambda x: 1 if state.lower() in x.lower() else 0)
+    district_score = pd.Series([0]*len(df_copy), index=df_copy.index)
+    if district != "Any":
+        district_score = df_copy["District"].fillna("").apply(lambda x: 1 if district.lower() in x.lower() else 0)
+
+    # Weighted final score
+    final_score = (skill_score * 0.6) + (edu_score * 0.1) + (sector_score * 0.1) + (state_score * 0.1) + (district_score * 0.1)
+    df_copy["Final Score"] = final_score
+    df_copy = df_copy.sort_values(by="Final Score", ascending=False)
+
+    # If no skills entered, return empty
+    if not user_skills.strip():
+        return pd.DataFrame()
 
     return df_copy.head(top_n)
 
@@ -177,13 +195,12 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
 # Display recommendations
 # ===============================
 if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="recommend_button"):
-    with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
-        time.sleep(2)  # Fake loading time
-
-        results = recommend_internships(skills, sector, state, district, mode, top_n=5)
+    with st.spinner("⚡ Fetching top internships... hang tight! 🚀"):
+        time.sleep(2)  # simulate loading
+        results = recommend_internships(skills, education, sector, state, district, mode, top_n=5)
 
     if results.empty:
-        st.warning(translate_ui("⚠️ No matching internships found. Try changing your filters.", language))
+        st.warning(translate_ui("⚠️ Please enter your skills to get recommendations.", language))
     else:
         st.subheader(translate_ui("✨ Top Recommended Internships", language))
         for idx, row in results.iterrows():
@@ -209,10 +226,9 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
             </div>
             """, unsafe_allow_html=True)
 
-            # Unique keys
+            # Expander with full details
             expander_key = f"expander_{idx}_{company_name.replace(' ', '_')}"
             button_key = f"apply_{idx}_{company_name.replace(' ', '_')}"
-
             with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
                 st.markdown(f"""
                 **Company Name:** {company_name}  
