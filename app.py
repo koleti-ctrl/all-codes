@@ -52,28 +52,25 @@ def translate_output(text, lang):
 # ===============================
 st.markdown("""
 <style>
-/* App background with pattern + gradient overlay */
+/* App background with AI image + gradient overlay */
 .stApp {
-    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    background-image: url('https://images.unsplash.com/photo-1612831662681-cf3f5cb2ef57?auto=format&fit=crop&w=1600&q=80');
     background-size: cover;
-    background-repeat: repeat;
+    background-repeat: no-repeat;
     background-attachment: fixed;
-    background-color: #1e1f2f;
+    background-position: center;
     color: #f0f0f0;
 }
 
-/* Sidebar with same pattern + semi-transparent overlay */
-.css-1d391kg {  /* Streamlit sidebar class */
-    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
-    background-size: cover;
-    background-repeat: repeat;
-    background-color: rgba(30, 31, 47, 0.95);
+/* Sidebar with semi-transparent overlay */
+.css-1d391kg {
+    background-color: rgba(30, 31, 47, 0.85);
     color: #f0f0f0;
 }
 
 /* Internship cards */
 .internship-card {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(255, 255, 255, 0.08);
     padding: 20px;
     margin-bottom: 15px;
     border-radius: 15px;
@@ -95,6 +92,7 @@ st.markdown("""
 .badge-trend { background-color:#d35400; }
 </style>
 """, unsafe_allow_html=True)
+
 # ===============================
 # Sidebar filters
 # ===============================
@@ -134,6 +132,17 @@ mode_input = st.sidebar.selectbox(
     translate_ui("💻 Preferred Mode", language),
     ["Any", "Online", "Offline"]  # Removed Remote
 )
+
+if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
+    # Place spinner here
+    with st.spinner("🤖 Crunching data for your dream internships... just a sec!"):
+        results = recommend_internships(skills, sector, state, district, mode, top_n=5)
+
+    # The rest of your code for displaying results
+    if results.empty:
+        st.warning(translate_ui("⚠️ No matching internships found. Try changing your filters.", language))
+    else:
+        ...
 
 # ===============================
 # Recommendation function
@@ -226,6 +235,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
                 """)
                 if st.button(f"✅ Apply to {company_name}", key=company_name+str(row["Opportunities Count"])):
                     st.success("📩 Application submitted successfully!")
+
 
 
 
