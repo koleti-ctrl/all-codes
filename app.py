@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from deep_translator import GoogleTranslator
 import time
 
 # ===============================
@@ -65,7 +66,7 @@ section[data-testid="stSidebar"] {
 """, unsafe_allow_html=True)
 
 # ===============================
-# Load CSV
+# Load default CSV
 # ===============================
 CSV_FILE = "internships.csv"
 try:
@@ -74,34 +75,82 @@ except FileNotFoundError:
     st.error("⚠️ Default CSV not found! Put 'internships.csv' in the app folder.")
     st.stop()
 
-# Ensure Opportunities is numeric
-df["Opportunities"] = pd.to_numeric(df["Opportunities"], errors='coerce').fillna(0).astype(int)
+# ===============================
+# Translation helpers
+# ===============================
+def translate_ui(text, lang):
+    if lang.lower() == "english":
+        return text
+    try:
+        return GoogleTranslator(source='auto', target=lang[:2].lower()).translate(text)
+    except:
+        return text
 
-# Strip column spaces
-df.columns = df.columns.str.strip()
+def translate_to_english(text, lang):
+    if lang.lower() == "english" or not text.strip():
+        return text
+    try:
+        return GoogleTranslator(source=lang[:2].lower(), target='en').translate(text)
+    except:
+        return text
+
+def translate_output(text, lang):
+    if lang.lower() == "english" or not text.strip():
+        return text
+    try:
+        return GoogleTranslator(source='auto', target=lang[:2].lower()).translate(text)
+    except:
+        return text
 
 # ===============================
 # Sidebar filters
 # ===============================
 st.sidebar.header("🧑 Your Profile")
 
-skills = st.sidebar.text_input("💼 Your Skills (comma-separated)")
-sector = st.sidebar.selectbox("🏢 Preferred Sector", options=["Any"] + sorted(df["Sector/Industry"].dropna().unique()))
-state = st.sidebar.selectbox("🌍 Preferred State", options=["Any"] + sorted(df["State"].dropna().unique()))
+language = st.sidebar.radio("🌐 Choose Language:", ["English", "Hindi", "Telugu"])
+
+education_input = st.sidebar.text_input(translate_ui("🎓 Your Education (optional)", language))
+education = translate_to_english(education_input, language)
+
+skills_input = st.sidebar.text_input(translate_ui("💼 Your Skills (comma-separated)", language))
+skills = translate_to_english(skills_input, language)
+
+sector_input = st.sidebar.selectbox(
+    translate_ui("🏢 Preferred Sector", language),
+    options=["Any"] + sorted(df["Sector/Industry"].dropna().unique())
+)
+sector = translate_to_english(sector_input, language)
+
+state_input = st.sidebar.selectbox(
+    translate_ui("🌍 Preferred State", language),
+    options=["Any"] + sorted(df["State"].dropna().unique())
+)
+state = translate_to_english(state_input, language)
 
 if state != "Any":
     districts = df[df["State"] == state]["District"].dropna().unique().tolist()
-    district = st.sidebar.selectbox("📍 Preferred District", options=["Any"] + sorted(districts))
+    district_input = st.sidebar.selectbox(
+        translate_ui("📍 Preferred District", language),
+        options=["Any"] + sorted(districts)
+    )
+    district = translate_to_english(district_input, language)
 else:
     district = "Any"
 
-mode = st.sidebar.selectbox("📝 Preferred Mode", options=["Any", "Online", "Offline"])
+mode_input = st.sidebar.selectbox(
+    translate_ui("📝 Preferred Mode", language),
+    options=["Any", "Online", "Offline"]
+)
+mode = translate_to_english(mode_input, language)
 
 # ===============================
 # Recommendation function
 # ===============================
 def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     df_copy = df.copy()
+
+    # Strip spaces from column names just in case
+    df_copy.columns = df_copy.columns.str.strip()
 
     # Filters
     if sector != "Any":
@@ -128,6 +177,7 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
         df_copy = df_copy.sort_values(by="Opportunities", ascending=False)
 
     return df_copy.head(top_n)
+
 
 # ===============================
 # Display recommendations
@@ -187,4 +237,15 @@ if st.sidebar.button("🔍 Recommend Internships"):
                     """)
                     if st.button("✅ Apply", key=button_key):
                         st.success(f"You chose to apply for {company_name} 🎉")
-
+KeyError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
+Traceback:
+File "/mount/src/all-codes/app.py", line 191, in <module>
+    results = recommend_internships(skills, sector, state, district, mode, top_n=5)
+File "/mount/src/all-codes/app.py", line 175, in recommend_internships
+    df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/frame.py", line 7179, in sort_values
+    keys = [self._get_label_or_level_values(x, axis=axis) for x in by]
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/generic.py", line 1911, in _get_label_or_level_values
+    raise KeyError(key)
+please remove the error from the code and give met whole modified code again
