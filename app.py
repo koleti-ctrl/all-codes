@@ -182,7 +182,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
         st.warning(translate_ui("⚠ Please enter your skills to get recommendations!", language))
     else:
         with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
-            time.sleep(2)  # Fake loading time
+            time.sleep(2)
             results = recommend_internships(skills, sector, state, district, mode, top_n=5)
 
         if results.empty:
@@ -197,7 +197,6 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                 address = translate_output(row["Address"], language)
                 opportunities = row["Opportunities"]
                 duration = row["Duration"]
-                last_date = row.get("Last Date to Register", "Not specified")
                 district_trans = translate_output(row["District"], language)
                 state_trans = translate_output(row["State"], language)
 
@@ -211,7 +210,8 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row.get('Internship Mode', 'Offline')}</span></div>
                     <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
                     <div class="internship-detail">🕒 Duration: {duration}</div>
-                    <div class="internship-detail">📅 Last Date: {last_date}</div>
+                    <div class="internship-detail">💼 Opportunities: {opportunities}</div>
+                    <div class="internship-detail">🏢 Address: {address}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -227,7 +227,6 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     **Skills Required:** {skills_req}  
                     **Opportunities:** {opportunities}  
                     **Duration:** {duration}  
-                    **Last Date to Apply:** {last_date}  
                     **Address:** {address}  
                     **District / State:** {district_trans}, {state_trans}  
                     """)
