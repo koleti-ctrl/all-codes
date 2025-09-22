@@ -52,15 +52,24 @@ def translate_output(text, lang):
 # ===============================
 st.markdown("""
 <style>
-/* Gradient background */
+/* App background with pattern + gradient overlay */
 .stApp {
-    background: linear-gradient(135deg, #1f4037, #99f2c8);
-    color: #1e1e2f;
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    background-size: cover;
+    background-repeat: repeat;
+    background-attachment: fixed;
+    background-color: #1e1f2f;
+    color: #f0f0f0;
+}
+
+/* Sidebar */
+.css-1d391kg {  /* Streamlit sidebar class */
+    background: rgba(30, 31, 47, 0.95);
 }
 
 /* Internship cards */
 .internship-card {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.05);
     padding: 20px;
     margin-bottom: 15px;
     border-radius: 15px;
@@ -71,29 +80,9 @@ st.markdown("""
     transform: translateY(-7px) scale(1.02);
 }
 
-/* Titles and details */
-.internship-title {
-    font-size: 22px;
-    font-weight: 700;
-    color: #ffcc00;
-    margin-bottom: 10px;
-}
-.internship-detail {
-    font-size: 16px;
-    color: #f0f0f0;
-    margin-bottom: 6px;
-}
-
-/* Badges */
-.badge {
-    display:inline-block;
-    padding:5px 10px;
-    margin-right:5px;
-    border-radius:12px;
-    font-size:12px;
-    font-weight:bold;
-    color:white;
-}
+/* Titles and badges */
+.internship-title { font-size:22px; font-weight:700; color:#00ffd5; }
+.internship-detail { font-size:16px; color:#f0f0f0; margin-bottom:6px; }
 .badge-online { background-color:#27ae60; }
 .badge-offline { background-color:#c0392b; }
 .badge-skill { background-color:#2980b9; }
@@ -234,6 +223,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
                 """)
                 if st.button(f"✅ Apply to {company_name}", key=company_name+str(row["Opportunities Count"])):
                     st.success("📩 Application submitted successfully!")
+
 
 
 
