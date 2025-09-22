@@ -176,12 +176,13 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
 # ===============================
 # Display recommendations
 # ===============================
-if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
+# Display recommendations
+if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="recommend_button"):
     if not skills.strip():
         st.warning(translate_ui("⚠ Please enter your skills to get recommendations!", language))
     else:
         with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
-            time.sleep(2)
+            time.sleep(2)  # Fake loading time
             results = recommend_internships(skills, sector, state, district, mode, top_n=5)
 
         if results.empty:
@@ -189,42 +190,38 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
         else:
             st.subheader(translate_ui("✨ Top Recommended Internships", language))
             for idx, row in results.iterrows():
-                company_name = row["Company"]
-                internship_title = row["Internship"]
-                sector_name = translate_output(row["Sector/Industry"], language)
-                skills_req = translate_output(row["Required Skills"], language)
-                address = translate_output(row["Address"], language)
-                opportunities = row["Opportunities"]
-                duration = row["Duration"]
-                district_trans = translate_output(row["District"], language)
-                state_trans = translate_output(row["State"], language)
-                match_score = row.get("Match Score", 0)
+                # Safe column access
+                company_name = row["Company"] if "Company" in row else "Unknown Company"
+                internship_title = row["Internship"] if "Internship" in row else "N/A"
+                sector_name = translate_output(row["Sector/Industry"], language) if "Sector/Industry" in row else "N/A"
+                skills_req = translate_output(row["Required Skills"], language) if "Required Skills" in row else "N/A"
+                address = translate_output(row["Address"], language) if "Address" in row else "N/A"
+                opportunities = row["Opportunities"] if "Opportunities" in row else "N/A"
+                duration = row["Duration"] if "Duration" in row else "Not specified"
+                last_date = row["Last Date to Register"] if "Last Date to Register" in row else "Not specified"
+                district_trans = translate_output(row["District"], language) if "District" in row else "N/A"
+                state_trans = translate_output(row["State"], language) if "State" in row else "N/A"
+                internship_mode = row["Internship Mode"] if "Internship Mode" in row else "Offline"
 
-                mode_class = "badge-online" if str(row.get("Internship Mode", "Offline")).lower() == "online" else "badge-offline"
-
-                # Badges
-                badges_html = ""
-                if opportunities >= 5:
-                    badges_html += '<span class="badge badge-online">🔥 High in Demand</span>'
-                if match_score >= 0.6:
-                    badges_html += '<span class="badge badge-skill">🚀 Highly Recruiting</span>'
+                mode_class = "badge-online" if str(internship_mode).lower() == "online" else "badge-offline"
 
                 # Main card
                 st.markdown(f"""
                 <div class="internship-card">
                     <div class="internship-title">{company_name} - {internship_title}</div>
                     <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
-                    <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row.get('Internship Mode', 'Offline')}</span></div>
+                    <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{internship_mode}</span></div>
                     <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
                     <div class="internship-detail">🕒 Duration: {duration}</div>
-                    <div class="internship-detail">🔢 Opportunities: {opportunities}</div>
-                    <div class="internship-detail">{badges_html}</div>
+                    <div class="internship-detail">📅 Last Date: {last_date}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Expander and apply button
+                # Unique keys to avoid duplication
                 expander_key = f"expander_{idx}"
                 button_key = f"apply_{idx}"
+
+                # Expander for full details
                 with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
                     st.markdown(f"""
                     **Company:** {company_name}  
@@ -233,6 +230,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
                     **Skills Required:** {skills_req}  
                     **Opportunities:** {opportunities}  
                     **Duration:** {duration}  
+                    **Last Date to Apply:** {last_date}  
                     **Address:** {address}  
                     **District / State:** {district_trans}, {state_trans}  
                     """)
