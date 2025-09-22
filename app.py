@@ -4,6 +4,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from deep_translator import GoogleTranslator
 import time
+import re
 
 # ===============================
 # Page setup
@@ -40,32 +41,29 @@ section[data-testid="stSidebar"] {
     transform: translateY(-7px) scale(1.02);
 }
 .internship-title {
-    font-size:24px;
-    font-weight:800;
+    font-size:22px;
+    font-weight:700;
     color:#ffcc00;
     margin-bottom:10px;
-    text-shadow: 1px 1px 4px #000000;
 }
 .internship-detail {
-    font-size:18px;
-    font-weight:600;
+    font-size:16px;
     color:#f0f0f0;
     margin-bottom:6px;
-    text-shadow: 1px 1px 3px #000000;
 }
 .badge {
     display:inline-block;
-    padding:6px 12px;
+    padding:5px 10px;
     margin-right:5px;
     border-radius:12px;
-    font-size:14px;
+    font-size:12px;
     font-weight:bold;
     color:white;
-    text-shadow: 1px 1px 2px #000000;
 }
 .badge-online { background-color:#27ae60; }
 .badge-offline { background-color:#c0392b; }
 .badge-skill { background-color:#2980b9; }
+.badge-demand { background-color:#e67e22; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -147,106 +145,114 @@ mode_input = st.sidebar.selectbox(
 mode = translate_to_english(mode_input, language)
 
 # ===============================
-# Weighted Recommendation function
+# Recommendation function with weighted scoring
 # ===============================
-def recommend_internships(user_skills, education, sector, state, district, mode, top_n=5):
-    df_copy = df.copy()
+def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
+    if not user_skills.strip():
+        return pd.DataFrame()  # Must provide skills
 
+    df_copy = df.copy()
+    if sector != "Any":
+        df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
+    if state != "Any":
+        df_copy = df_copy[df_copy["State"].str.contains(state, case=False, na=False)]
+    if district != "Any":
+        df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
     if mode != "Any":
         df_copy = df_copy[df_copy["Internship Mode"].str.contains(mode, case=False, na=False)]
+
     if df_copy.empty:
         return pd.DataFrame()
 
-    # Skill similarity
-    skill_score = pd.Series([0]*len(df_copy), index=df_copy.index)
-    if user_skills.strip():
-        vectorizer = TfidfVectorizer()
-        skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
-        user_vector = vectorizer.transform([user_skills])
-        similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
-        skill_score = pd.Series(similarity_scores, index=df_copy.index)
+    # Skills similarity (highest weight)
+    vectorizer = TfidfVectorizer()
+    skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
+    user_vector = vectorizer.transform([user_skills])
+    similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
 
-    # Education match
-    edu_score = pd.Series([0]*len(df_copy), index=df_copy.index)
-    if education.strip() and "Education Requirement" in df_copy.columns:
-        edu_score = df_copy["Education Requirement"].fillna("").apply(
-            lambda x: 1 if education.lower() in x.lower() else 0
-        )
-
-    # Sector / State / District match
-    sector_score = pd.Series([0]*len(df_copy), index=df_copy.index)
+    # Weighted scoring
+    df_copy["Match Score"] = similarity_scores * 0.6  # Skills weight 60%
+    # Bonus weight for matching education
+    if education.strip():
+        df_copy["Match Score"] += df_copy.get("Education", "").apply(lambda x: 0.1 if education.lower() in str(x).lower() else 0)
+    # Bonus weight for sector, state, district matches
     if sector != "Any":
-        sector_score = df_copy["Sector/Industry"].fillna("").apply(lambda x: 1 if sector.lower() in x.lower() else 0)
-    state_score = pd.Series([0]*len(df_copy), index=df_copy.index)
+        df_copy["Match Score"] += 0.1
     if state != "Any":
-        state_score = df_copy["State"].fillna("").apply(lambda x: 1 if state.lower() in x.lower() else 0)
-    district_score = pd.Series([0]*len(df_copy), index=df_copy.index)
+        df_copy["Match Score"] += 0.1
     if district != "Any":
-        district_score = df_copy["District"].fillna("").apply(lambda x: 1 if district.lower() in x.lower() else 0)
+        df_copy["Match Score"] += 0.1
 
-    # Weighted final score
-    final_score = (skill_score * 0.6) + (edu_score * 0.1) + (sector_score * 0.1) + (state_score * 0.1) + (district_score * 0.1)
-    df_copy["Final Score"] = final_score
-    df_copy = df_copy.sort_values(by="Final Score", ascending=False)
-
-    # If no skills entered, return empty
-    if not user_skills.strip():
-        return pd.DataFrame()
-
+    # Sort by Match Score + Opportunities
+    df_copy = df_copy.sort_values(by=["Match Score", "Opportunities Count"], ascending=False)
     return df_copy.head(top_n)
 
 # ===============================
 # Display recommendations
 # ===============================
 if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="recommend_button"):
-    with st.spinner("⚡ Fetching top internships... hang tight! 🚀"):
-        time.sleep(2)  # simulate loading
-        results = recommend_internships(skills, education, sector, state, district, mode, top_n=5)
-
-    if results.empty:
-        st.warning(translate_ui("⚠️ Please enter your skills to get recommendations.", language))
+    if not skills.strip():
+        st.warning(translate_ui("⚠️ Please enter your skills to get recommendations!", language))
     else:
-        st.subheader(translate_ui("✨ Top Recommended Internships", language))
-        for idx, row in results.iterrows():
-            company_name = row["Company Name"]
-            sector_name = translate_output(row["Sector/Industry"], language)
-            skills_req = translate_output(row["Required Skills"], language)
-            address = translate_output(row["Address"], language)
-            description = translate_output(row.get("Description", "No description available"), language)
-            district_trans = translate_output(row["District"], language)
-            state_trans = translate_output(row["State"], language)
-            last_date = translate_output(str(row.get("Last Date to Register", "Not specified")), language)
-            duration = translate_output(str(row.get("Duration", "Not specified")), language)
+        with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
+            time.sleep(2)  # Simulated loading
+            results = recommend_internships(skills, sector, state, district, mode, top_n=5)
 
-            mode_class = "badge-online" if str(row["Internship Mode"]).lower() == "online" else "badge-offline"
+        if results.empty:
+            st.warning(translate_ui("⚠️ No matching internships found. Try changing your filters.", language))
+        else:
+            st.subheader(translate_ui("✨ Top Recommended Internships", language))
+            for idx, row in results.iterrows():
+                company_name = row["Company Name"]
+                sector_name = translate_output(row["Sector/Industry"], language)
+                skills_req = translate_output(row["Required Skills"], language)
+                address = translate_output(row["Address"], language)
+                description = translate_output(row.get("Description", "No description available"), language)
+                district_trans = translate_output(row["District"], language)
+                state_trans = translate_output(row["State"], language)
+                last_date = translate_output(str(row.get("Last Date to Register", "Not specified")), language)
+                duration = translate_output(str(row.get("Duration", "Not specified")), language)
+                
+                # Demand badge
+                demand_badge = ""
+                if row["Opportunities Count"] >= 10:
+                    demand_badge = '<span class="badge badge-demand">🔥 High in Demand</span>'
 
-            # Main card
-            st.markdown(f"""
-            <div class="internship-card">
-                <div class="internship-title">{company_name} - {sector_name}</div>
-                <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
-                <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row['Internship Mode']}</span></div>
-                <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
-            </div>
-            """, unsafe_allow_html=True)
+                mode_class = "badge-online" if str(row["Internship Mode"]).lower() == "online" else "badge-offline"
 
-            # Expander with full details
-            expander_key = f"expander_{idx}_{company_name.replace(' ', '_')}"
-            button_key = f"apply_{idx}_{company_name.replace(' ', '_')}"
-            with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
+                # Main card
                 st.markdown(f"""
-                **Company Name:** {company_name}  
-                **Sector/Industry:** {sector_name}  
-                **Education (Optional):** {education if education else 'Not specified'}  
-                **Internship Mode:** {row['Internship Mode']}  
-                **Address:** {address}  
-                **District / State:** {district_trans}, {state_trans}  
-                **Opportunities:** {row['Opportunities Count']}  
-                **Skills Required:** {skills_req}  
-                **Role / Description:** {description}  
-                **Last Date to Apply:** {last_date}  
-                **Duration:** {duration}  
-                """)
-                if st.button(f"✅ Apply to {company_name}", key=button_key):
-                    st.success(f"You chose to apply for {company_name} 🎉")
+                <div class="internship-card">
+                    <div class="internship-title">{company_name} - {sector_name} {demand_badge}</div>
+                    <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
+                    <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row['Internship Mode']}</span></div>
+                    <div class="internship-detail">💼 Skills: 
+                        {" ".join([f'<span class="badge badge-skill">{skill.strip()}</span>' for skill in skills_req.split(",")])}
+                    </div>
+                    <div class="internship-detail">🕒 Duration: {duration}</div>
+                    <div class="internship-detail">📅 Last Date: {last_date}</div>
+                    <div class="internship-detail">🏢 Address: {address}</div>
+                    <div class="internship-detail">📝 Role / Description: {description}</div>
+                    <br>
+                </div>
+                """, unsafe_allow_html=True)
 
+                expander_key = f"expander_{idx}_{re.sub(r'[^a-zA-Z0-9_]', '_', company_name)}"
+                button_key = f"apply_{idx}_{re.sub(r'[^a-zA-Z0-9_]', '_', company_name)}"
+
+                with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
+                    st.markdown(f"""
+                    **Company Name:** {company_name}  
+                    **Sector/Industry:** {sector_name}  
+                    **Education (Optional):** {education if education else 'Not specified'}  
+                    **Internship Mode:** {row['Internship Mode']}  
+                    **Address:** {address}  
+                    **District / State:** {district_trans}, {state_trans}  
+                    **Opportunities:** {row['Opportunities Count']}  
+                    **Skills Required:** {skills_req}  
+                    **Role / Description:** {description}  
+                    **Last Date to Apply:** {last_date}  
+                    **Duration:** {duration}  
+                    """)
+                    if st.button(f"✅ Apply to {company_name}", key=button_key):
+                        st.success(f"You chose to apply for {company_name} 🎉")
