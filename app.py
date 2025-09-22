@@ -149,6 +149,10 @@ mode = translate_to_english(mode_input, language)
 def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     df_copy = df.copy()
 
+    # Strip spaces from column names just in case
+    df_copy.columns = df_copy.columns.str.strip()
+
+    # Filters
     if sector != "Any":
         df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
     if state != "Any":
@@ -161,17 +165,19 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if df_copy.empty:
         return pd.DataFrame()
 
+    # Skill similarity using TF-IDF
     if user_skills.strip():
         vectorizer = TfidfVectorizer()
         skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
         user_vector = vectorizer.transform([user_skills])
         similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
         df_copy["Match Score"] = similarity_scores
-        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities Count"], ascending=False)
+        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
     else:
-        df_copy = df_copy.sort_values(by="Opportunities Count", ascending=False)
+        df_copy = df_copy.sort_values(by="Opportunities", ascending=False)
 
     return df_copy.head(top_n)
+
 
 # ===============================
 # Display recommendations
@@ -180,8 +186,8 @@ if st.sidebar.button("🔍 Recommend Internships"):
     if not skills.strip():
         st.warning("⚠ Please enter your skills to get recommendations!")
     else:
-        with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
-            time.sleep(1)  # simulate loading
+        with st.spinner("⚡ Finding the best internships for you..."):
+            time.sleep(1)
             results = recommend_internships(skills, sector, state, district, mode, top_n=5)
 
         if results.empty:
@@ -194,14 +200,14 @@ if st.sidebar.button("🔍 Recommend Internships"):
                 sector_name = row["Sector/Industry"]
                 skills_req = row["Required Skills"]
                 address = row["Address"]
-                opportunities = row["Opportunities"]
+                opportunities = int(row["Opportunities"])
                 duration = row["Duration"]
                 district_trans = row["District"]
                 state_trans = row["State"]
 
                 # Badges
                 mode_class = "badge-online" if str(row.get("Internship Mode", "Offline")).lower() == "online" else "badge-offline"
-                high_recruiting = '<span style="background-color:#e67e22;color:white;padding:4px 8px;border-radius:8px;font-size:12px;font-weight:bold;">🔥 High Recruiting</span>' if int(opportunities) >= 10 else ""
+                high_recruiting = '<span style="background-color:#e67e22;color:white;padding:4px 8px;border-radius:8px;font-size:12px;font-weight:bold;">🔥 High Recruiting</span>' if opportunities >= 10 else ""
 
                 # Main card
                 st.markdown(f"""
@@ -215,10 +221,9 @@ if st.sidebar.button("🔍 Recommend Internships"):
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Unique keys
+                # Expander with apply button
                 expander_key = f"expander_{idx}"
                 button_key = f"apply_{idx}"
-
                 with st.expander("📖 View Full Details", expanded=False, key=expander_key):
                     st.markdown(f"""
                     **Company:** {company_name}  
