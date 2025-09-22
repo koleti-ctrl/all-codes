@@ -62,9 +62,13 @@ st.markdown("""
     color: #f0f0f0;
 }
 
-/* Sidebar */
+/* Sidebar with same pattern + semi-transparent overlay */
 .css-1d391kg {  /* Streamlit sidebar class */
-    background: rgba(30, 31, 47, 0.95);
+    background-image: url('https://www.transparenttextures.com/patterns/cubes.png');
+    background-size: cover;
+    background-repeat: repeat;
+    background-color: rgba(30, 31, 47, 0.95);
+    color: #f0f0f0;
 }
 
 /* Internship cards */
@@ -91,7 +95,6 @@ st.markdown("""
 .badge-trend { background-color:#d35400; }
 </style>
 """, unsafe_allow_html=True)
-
 # ===============================
 # Sidebar filters
 # ===============================
@@ -223,6 +226,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
                 """)
                 if st.button(f"✅ Apply to {company_name}", key=company_name+str(row["Opportunities Count"])):
                     st.success("📩 Application submitted successfully!")
+
 
 
 
