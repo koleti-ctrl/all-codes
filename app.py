@@ -147,7 +147,7 @@ mode = translate_to_english(mode_input, language)
 # ===============================
 # Recommendation function
 # ===============================
-def recommend_internships(user_skills, education, sector, state, district, mode, top_n=5):
+def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if not user_skills.strip():
         return pd.DataFrame()  # Must provide skills
 
@@ -159,7 +159,7 @@ def recommend_internships(user_skills, education, sector, state, district, mode,
     if district != "Any":
         df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
     if mode != "Any":
-        df_copy = df_copy[df_copy["Internship"].str.contains(mode, case=False, na=False)]  # Using Internship as mode column placeholder
+        df_copy = df_copy[df_copy["Internship"].str.contains(mode, case=False, na=False)]
 
     if df_copy.empty:
         return pd.DataFrame()
@@ -171,11 +171,9 @@ def recommend_internships(user_skills, education, sector, state, district, mode,
     similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
 
     # Weighted scoring
-    df_copy["Match Score"] = similarity_scores * 0.6  # Skills weight 60%
-    # Bonus weight for matching education
-    if education.strip():
-        df_copy["Match Score"] += df_copy.get("Internship", "").apply(lambda x: 0.1 if education.lower() in str(x).lower() else 0)
-    # Bonus weight for sector, state, district matches
+    df_copy["Match Score"] = similarity_scores * 0.7  # Skills weight 70%
+
+    # Bonus weight for matching sector, state, district
     if sector != "Any":
         df_copy["Match Score"] += 0.1
     if state != "Any":
@@ -243,4 +241,5 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     </a>
                 </div>
                 """, unsafe_allow_html=True)
+
 
