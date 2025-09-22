@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from deep_translator import GoogleTranslator
 import time
 
 # ===============================
@@ -66,7 +65,7 @@ section[data-testid="stSidebar"] {
 """, unsafe_allow_html=True)
 
 # ===============================
-# Load default CSV
+# Load CSV
 # ===============================
 CSV_FILE = "internships.csv"
 try:
@@ -75,82 +74,34 @@ except FileNotFoundError:
     st.error("⚠️ Default CSV not found! Put 'internships.csv' in the app folder.")
     st.stop()
 
-# ===============================
-# Translation helpers
-# ===============================
-def translate_ui(text, lang):
-    if lang.lower() == "english":
-        return text
-    try:
-        return GoogleTranslator(source='auto', target=lang[:2].lower()).translate(text)
-    except:
-        return text
+# Ensure Opportunities is numeric
+df["Opportunities"] = pd.to_numeric(df["Opportunities"], errors='coerce').fillna(0).astype(int)
 
-def translate_to_english(text, lang):
-    if lang.lower() == "english" or not text.strip():
-        return text
-    try:
-        return GoogleTranslator(source=lang[:2].lower(), target='en').translate(text)
-    except:
-        return text
-
-def translate_output(text, lang):
-    if lang.lower() == "english" or not text.strip():
-        return text
-    try:
-        return GoogleTranslator(source='auto', target=lang[:2].lower()).translate(text)
-    except:
-        return text
+# Strip column spaces
+df.columns = df.columns.str.strip()
 
 # ===============================
 # Sidebar filters
 # ===============================
 st.sidebar.header("🧑 Your Profile")
 
-language = st.sidebar.radio("🌐 Choose Language:", ["English", "Hindi", "Telugu"])
-
-education_input = st.sidebar.text_input(translate_ui("🎓 Your Education (optional)", language))
-education = translate_to_english(education_input, language)
-
-skills_input = st.sidebar.text_input(translate_ui("💼 Your Skills (comma-separated)", language))
-skills = translate_to_english(skills_input, language)
-
-sector_input = st.sidebar.selectbox(
-    translate_ui("🏢 Preferred Sector", language),
-    options=["Any"] + sorted(df["Sector/Industry"].dropna().unique())
-)
-sector = translate_to_english(sector_input, language)
-
-state_input = st.sidebar.selectbox(
-    translate_ui("🌍 Preferred State", language),
-    options=["Any"] + sorted(df["State"].dropna().unique())
-)
-state = translate_to_english(state_input, language)
+skills = st.sidebar.text_input("💼 Your Skills (comma-separated)")
+sector = st.sidebar.selectbox("🏢 Preferred Sector", options=["Any"] + sorted(df["Sector/Industry"].dropna().unique()))
+state = st.sidebar.selectbox("🌍 Preferred State", options=["Any"] + sorted(df["State"].dropna().unique()))
 
 if state != "Any":
     districts = df[df["State"] == state]["District"].dropna().unique().tolist()
-    district_input = st.sidebar.selectbox(
-        translate_ui("📍 Preferred District", language),
-        options=["Any"] + sorted(districts)
-    )
-    district = translate_to_english(district_input, language)
+    district = st.sidebar.selectbox("📍 Preferred District", options=["Any"] + sorted(districts))
 else:
     district = "Any"
 
-mode_input = st.sidebar.selectbox(
-    translate_ui("📝 Preferred Mode", language),
-    options=["Any", "Online", "Offline"]
-)
-mode = translate_to_english(mode_input, language)
+mode = st.sidebar.selectbox("📝 Preferred Mode", options=["Any", "Online", "Offline"])
 
 # ===============================
 # Recommendation function
 # ===============================
 def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     df_copy = df.copy()
-
-    # Strip spaces from column names just in case
-    df_copy.columns = df_copy.columns.str.strip()
 
     # Filters
     if sector != "Any":
@@ -177,7 +128,6 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
         df_copy = df_copy.sort_values(by="Opportunities", ascending=False)
 
     return df_copy.head(top_n)
-
 
 # ===============================
 # Display recommendations
@@ -237,3 +187,4 @@ if st.sidebar.button("🔍 Recommend Internships"):
                     """)
                     if st.button("✅ Apply", key=button_key):
                         st.success(f"You chose to apply for {company_name} 🎉")
+
