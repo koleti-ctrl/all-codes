@@ -144,8 +144,12 @@ mode = translate_to_english(mode_input, language)
 # Recommendation function
 # ===============================
 def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
+    if not user_skills.strip():
+        return pd.DataFrame()  # Skills are required
+
     df_copy = df.copy()
 
+    # Apply filters
     if sector != "Any":
         df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
     if state != "Any":
@@ -155,21 +159,26 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if mode != "Any":
         df_copy = df_copy[df_copy["Internship Mode"].str.contains(mode, case=False, na=False)]
 
-    if df_copy.empty or not user_skills.strip():
+    if df_copy.empty:
         return pd.DataFrame()
 
-    # Strict skill search with TF-IDF + cosine similarity
+    # Strict skill matching using TF-IDF
     vectorizer = TfidfVectorizer()
     skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
     user_vector = vectorizer.transform([user_skills])
     similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
+    
     df_copy["Match Score"] = similarity_scores
 
-    # Filter to only those with at least one skill match
-    df_copy = df_copy[df_copy["Match Score"] > 0]
+    # Sort by existing columns only
+    sort_columns = []
+    if "Match Score" in df_copy.columns:
+        sort_columns.append("Match Score")
+    if "Opportunities" in df_copy.columns:
+        sort_columns.append("Opportunities")
 
-    # Sort by match score and opportunities
-    df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
+    if sort_columns:
+        df_copy = df_copy.sort_values(by=sort_columns, ascending=False)
 
     return df_copy.head(top_n)
 
@@ -236,3 +245,4 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     """)
                     if st.button(f"✅ Apply", key=button_key):
                         st.success(f"You chose to apply for {company_name} 🎉")
+
