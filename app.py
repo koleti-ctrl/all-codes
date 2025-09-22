@@ -222,4 +222,25 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     <div class="internship-title">{company_name} - {sector_name} {high_demand_badge}</div>
                     <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
                     <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row['Internship']}</span></div>
-                    <div class="internship-detail">💼 Skills
+                    <div class="internship-detail">💼 Skills:
+                          {" ".join([f'<span class="badge badge-skill">{skill.strip()}</span>' for skill in skills_req.split(",")])}
+                    </div>
+                    <div class="internship-detail">🕒 Duration: {duration}</div>
+                    <div class="internship-detail">📊 Opportunities: {opportunities}</div>
+                    <div class="internship-detail">🏢 Address: {address}</div>
+                    <div class="internship-detail">📝 Role / Description: {description}</div>
+                    <br>
+                    <a href="{row['Application Link']}" target="_blank">
+                        <button style="
+                            background-color:#3182ce; 
+                            color:white; 
+                            border:none; 
+                            padding:8px 16px; 
+                            border-radius:8px; 
+                            cursor:pointer;
+                            font-weight:bold;
+                        ">✅ Apply Now</button>
+                    </a>
+                </div>
+                """, unsafe_allow_html=True)
+
