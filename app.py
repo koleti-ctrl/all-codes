@@ -62,7 +62,6 @@ section[data-testid="stSidebar"] {
 .badge-online { background-color:#27ae60; }
 .badge-offline { background-color:#c0392b; }
 .badge-skill { background-color:#2980b9; }
-.badge-highdemand { background-color:#e67e22; font-weight:bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -110,9 +109,6 @@ st.sidebar.header("🧑 Your Profile")
 
 language = st.sidebar.radio("🌐 Choose Language:", ["English", "Hindi", "Telugu"])
 
-education_input = st.sidebar.text_input(translate_ui("🎓 Your Education (optional)", language))
-education = translate_to_english(education_input, language)
-
 skills_input = st.sidebar.text_input(translate_ui("💼 Your Skills (comma-separated)", language))
 skills = translate_to_english(skills_input, language)
 
@@ -145,13 +141,14 @@ mode_input = st.sidebar.selectbox(
 mode = translate_to_english(mode_input, language)
 
 # ===============================
-# Recommendation function
+# Recommendation function (AI-powered based on skills)
 # ===============================
 def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if not user_skills.strip():
         return pd.DataFrame()  # Must provide skills
 
     df_copy = df.copy()
+
     if sector != "Any":
         df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
     if state != "Any":
@@ -159,30 +156,21 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if district != "Any":
         df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
     if mode != "Any":
-        df_copy = df_copy[df_copy["Internship"].str.contains(mode, case=False, na=False)]
+        df_copy = df_copy[df_copy["Internship"].str.contains(mode, case=False, na=False)]  # Replace with correct mode column
 
     if df_copy.empty:
         return pd.DataFrame()
 
-    # Skills similarity (highest weight)
+    # AI-powered skill matching
     vectorizer = TfidfVectorizer()
     skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
     user_vector = vectorizer.transform([user_skills])
     similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
+    df_copy["Match Score"] = similarity_scores
 
-    # Weighted scoring
-    df_copy["Match Score"] = similarity_scores * 0.7  # Skills weight 70%
+    # Sort by highest skill match
+    df_copy = df_copy.sort_values(by="Match Score", ascending=False)
 
-    # Bonus weight for matching sector, state, district
-    if sector != "Any":
-        df_copy["Match Score"] += 0.1
-    if state != "Any":
-        df_copy["Match Score"] += 0.1
-    if district != "Any":
-        df_copy["Match Score"] += 0.1
-
-    # Sort by Match Score + Opportunities
-    df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
     return df_copy.head(top_n)
 
 # ===============================
@@ -193,8 +181,8 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
         st.warning(translate_ui("⚠️ Please enter your skills to get recommendations.", language))
     else:
         with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
-            time.sleep(1)
-            results = recommend_internships(skills, education, sector, state, district, mode, top_n=5)
+            time.sleep(2)  # Optional loading effect
+            results = recommend_internships(skills, sector, state, district, mode, top_n=5)
 
         if results.empty:
             st.warning(translate_ui("⚠️ No matching internships found. Try changing your filters.", language))
@@ -205,30 +193,26 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                 sector_name = translate_output(row["Sector/Industry"], language)
                 skills_req = translate_output(row["Required Skills"], language)
                 address = translate_output(row["Address"], language)
-                description = translate_output(row.get("Internship", "No description available"), language)
+                internship_name = translate_output(row["Internship"], language)
                 district_trans = translate_output(row["District"], language)
                 state_trans = translate_output(row["State"], language)
                 duration = translate_output(str(row.get("Duration", "Not specified")), language)
-                opportunities = row["Opportunities"]
+                app_link = row.get("Application Link", "#")
 
-                mode_class = "badge-online" if "online" in row["Internship"].lower() else "badge-offline"
-                high_demand_badge = '<span class="badge badge-highdemand">🔥 High in Demand</span>' if opportunities >= 5 else ""
+                mode_class = "badge-online" if "online" in internship_name.lower() else "badge-offline"
 
                 # Main card
                 st.markdown(f"""
                 <div class="internship-card">
-                    <div class="internship-title">{company_name} - {sector_name} {high_demand_badge}</div>
+                    <div class="internship-title">{company_name} - {internship_name} ({sector_name})</div>
                     <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
-                    <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row['Internship']}</span></div>
-                    <div class="internship-detail">💼 Skills:
-                          {" ".join([f'<span class="badge badge-skill">{skill.strip()}</span>' for skill in skills_req.split(",")])}
+                    <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{internship_name}</span></div>
+                    <div class="internship-detail">💼 Skills: 
+                        {" ".join([f'<span class="badge badge-skill">{skill.strip()}</span>' for skill in skills_req.split(",")])}
                     </div>
                     <div class="internship-detail">🕒 Duration: {duration}</div>
-                    <div class="internship-detail">📊 Opportunities: {opportunities}</div>
-                    <div class="internship-detail">🏢 Address: {address}</div>
-                    <div class="internship-detail">📝 Role / Description: {description}</div>
                     <br>
-                    <a href="{row['Application Link']}" target="_blank">
+                    <a href="{app_link}" target="_blank">
                         <button style="
                             background-color:#3182ce; 
                             color:white; 
@@ -237,9 +221,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                             border-radius:8px; 
                             cursor:pointer;
                             font-weight:bold;
-                        ">✅ Apply Now</button>
+                        ">✅ Apply</button>
                     </a>
                 </div>
                 """, unsafe_allow_html=True)
-
-
