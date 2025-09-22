@@ -52,15 +52,50 @@ def translate_output(text, lang):
 # ===============================
 st.markdown("""
 <style>
-.stApp { background-color: #1e1e2f; color: white; }
-.internship-card { background-color: #2e2e3f; padding:20px; margin-bottom:15px; border-radius:15px; box-shadow:0 4px 12px rgba(0,0,0,0.5); transition:transform 0.3s; }
-.internship-card:hover { transform: translateY(-7px) scale(1.02); }
-.internship-title { font-size:22px; font-weight:700; color:#ffcc00; margin-bottom:10px; }
-.internship-detail { font-size:16px; color:#f0f0f0; margin-bottom:6px; }
-.badge { display:inline-block; padding:5px 10px; margin-right:5px; border-radius:12px; font-size:12px; font-weight:bold; color:white; }
-.badge-online { background-color:#27ae60; } 
-.badge-offline { background-color:#c0392b; } 
-.badge-remote { background-color:#8e44ad; }
+/* Gradient background */
+.stApp {
+    background: linear-gradient(135deg, #1f4037, #99f2c8);
+    color: #1e1e2f;
+}
+
+/* Internship cards */
+.internship-card {
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    margin-bottom: 15px;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: transform 0.3s;
+}
+.internship-card:hover {
+    transform: translateY(-7px) scale(1.02);
+}
+
+/* Titles and details */
+.internship-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #ffcc00;
+    margin-bottom: 10px;
+}
+.internship-detail {
+    font-size: 16px;
+    color: #f0f0f0;
+    margin-bottom: 6px;
+}
+
+/* Badges */
+.badge {
+    display:inline-block;
+    padding:5px 10px;
+    margin-right:5px;
+    border-radius:12px;
+    font-size:12px;
+    font-weight:bold;
+    color:white;
+}
+.badge-online { background-color:#27ae60; }
+.badge-offline { background-color:#c0392b; }
 .badge-skill { background-color:#2980b9; }
 .badge-demand { background-color:#e67e22; }
 .badge-top { background-color:#16a085; }
@@ -105,7 +140,7 @@ else:
 
 mode_input = st.sidebar.selectbox(
     translate_ui("💻 Preferred Mode", language),
-    ["Any", "Online", "Offline", "Remote"]
+    ["Any", "Online", "Offline"]  # Removed Remote
 )
 
 # ===============================
@@ -199,5 +234,6 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
                 """)
                 if st.button(f"✅ Apply to {company_name}", key=company_name+str(row["Opportunities Count"])):
                     st.success("📩 Application submitted successfully!")
+
 
 
