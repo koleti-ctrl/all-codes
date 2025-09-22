@@ -150,29 +150,40 @@ mode = translate_to_english(mode_input, language)
 def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     df_copy = df.copy()
 
-    if sector != "Any":
+    # Filter based on sector, state, district
+    if sector != "Any" and "Sector/Industry" in df_copy.columns:
         df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
-    if state != "Any":
+    if state != "Any" and "State" in df_copy.columns:
         df_copy = df_copy[df_copy["State"].str.contains(state, case=False, na=False)]
-    if district != "Any":
+    if district != "Any" and "District" in df_copy.columns:
         df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
-    if mode != "Any":
-        df_copy = df_copy[df_copy.get("Internship Mode", "Offline").str.contains(mode, case=False, na=False)]
+    if mode != "Any" and "Internship Mode" in df_copy.columns:
+        df_copy = df_copy[df_copy["Internship Mode"].str.contains(mode, case=False, na=False)]
 
     if df_copy.empty:
         return pd.DataFrame()
 
-    if user_skills.strip():
+    # Compute skill similarity if user entered skills
+    if user_skills.strip() and "Required Skills" in df_copy.columns:
         vectorizer = TfidfVectorizer()
         skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
         user_vector = vectorizer.transform([user_skills])
         similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
         df_copy["Match Score"] = similarity_scores
-        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
     else:
-        df_copy = df_copy.sort_values(by="Opportunities", ascending=False)
+        df_copy["Match Score"] = 0
+
+    # Ensure Opportunities column exists and numeric
+    if "Opportunities" not in df_copy.columns:
+        df_copy["Opportunities"] = 0
+    else:
+        df_copy["Opportunities"] = pd.to_numeric(df_copy["Opportunities"], errors="coerce").fillna(0)
+
+    # Sort by Match Score and Opportunities
+    df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
 
     return df_copy.head(top_n)
+
 
 # ===============================
 # Display recommendations
@@ -190,15 +201,16 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
         else:
             st.subheader(translate_ui("✨ Top Recommended Internships", language))
             for idx, row in results.iterrows():
-                company_name = row["Company"]
-                internship_title = row["Internship"]
-                sector_name = translate_output(row["Sector/Industry"], language)
-                skills_req = translate_output(row["Required Skills"], language)
-                address = translate_output(row["Address"], language)
-                opportunities = row["Opportunities"]
-                duration = row["Duration"]
-                district_trans = translate_output(row["District"], language)
-                state_trans = translate_output(row["State"], language)
+                company_name = row.get("Company", "Not specified")
+                internship_title = row.get("Internship", "Not specified")
+                sector_name = translate_output(row.get("Sector/Industry", ""), language)
+                skills_req = translate_output(row.get("Required Skills", ""), language)
+                address = translate_output(row.get("Address", ""), language)
+                opportunities = row.get("Opportunities", 0)
+                duration = row.get("Duration", "Not specified")
+                last_date = row.get("Last Date to Register", "Not specified")
+                district_trans = translate_output(row.get("District", ""), language)
+                state_trans = translate_output(row.get("State", ""), language)
 
                 mode_class = "badge-online" if str(row.get("Internship Mode", "Offline")).lower() == "online" else "badge-offline"
 
@@ -210,8 +222,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row.get('Internship Mode', 'Offline')}</span></div>
                     <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
                     <div class="internship-detail">🕒 Duration: {duration}</div>
-                    <div class="internship-detail">💼 Opportunities: {opportunities}</div>
-                    <div class="internship-detail">🏢 Address: {address}</div>
+                    <div class="internship-detail">📅 Last Date: {last_date}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -227,6 +238,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     **Skills Required:** {skills_req}  
                     **Opportunities:** {opportunities}  
                     **Duration:** {duration}  
+                    **Last Date to Apply:** {last_date}  
                     **Address:** {address}  
                     **District / State:** {district_trans}, {state_trans}  
                     """)
