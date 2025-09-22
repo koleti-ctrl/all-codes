@@ -71,7 +71,7 @@ section[data-testid="stSidebar"] {
 CSV_FILE = "internships.csv"
 try:
     df = pd.read_csv(CSV_FILE)
-    df.columns = df.columns.str.strip()
+    df.columns = df.columns.str.strip()  # remove extra spaces from column names
 except FileNotFoundError:
     st.error("⚠ Default CSV not found! Put 'internships.csv' in the app folder.")
     st.stop()
@@ -157,7 +157,7 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if district != "Any":
         df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
     if mode != "Any":
-        df_copy = df_copy[df_copy["Internship Mode"].str.contains(mode, case=False, na=False)]
+        df_copy = df_copy[df_copy.get("Internship Mode", "Offline").str.contains(mode, case=False, na=False)]
 
     if df_copy.empty:
         return pd.DataFrame()
@@ -168,9 +168,9 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
         user_vector = vectorizer.transform([user_skills])
         similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
         df_copy["Match Score"] = similarity_scores
-        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities Count"], ascending=False)
+        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
     else:
-        df_copy = df_copy.sort_values(by="Opportunities Count", ascending=False)
+        df_copy = df_copy.sort_values(by="Opportunities", ascending=False)
 
     return df_copy.head(top_n)
 
@@ -190,17 +190,16 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
         else:
             st.subheader(translate_ui("✨ Top Recommended Internships", language))
             for idx, row in results.iterrows():
-                company_name = row.get("Company", "Not specified")
-                internship_title = row.get("Internship", "Not specified")
-                sector_name = translate_output(row.get("Sector/Industry", ""), language)
-                skills_req = translate_output(row.get("Required Skills", ""), language)
-                address = translate_output(row.get("Address", ""), language)
-                opportunities = row.get("Opportunities", "N/A")
-                duration = row.get("Duration", "N/A")
-                last_date = row.get("Last Date to Register", "Not specified")  
-                district_trans = translate_output(row.get("District", ""), language)
-                state_trans = translate_output(row.get("State", ""), language)
-                application_link = row.get("Application Link", "#")
+                company_name = row["Company"]
+                internship_title = row["Internship"]
+                sector_name = translate_output(row["Sector/Industry"], language)
+                skills_req = translate_output(row["Required Skills"], language)
+                address = translate_output(row["Address"], language)
+                opportunities = row["Opportunities"]
+                duration = row["Duration"]
+                last_date = row.get("Last Date to Register", "Not specified")
+                district_trans = translate_output(row["District"], language)
+                state_trans = translate_output(row["State"], language)
 
                 mode_class = "badge-online" if str(row.get("Internship Mode", "Offline")).lower() == "online" else "badge-offline"
 
@@ -216,9 +215,10 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Unique keys (index-based to avoid duplicates)
+                # Unique keys
                 expander_key = f"expander_{idx}"
-                
+                button_key = f"apply_{idx}"
+
                 with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
                     st.markdown(f"""
                     **Company:** {company_name}  
@@ -231,19 +231,5 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     **Address:** {address}  
                     **District / State:** {district_trans}, {state_trans}  
                     """)
-                    # Apply button opens the application link directly
-                    st.markdown(f"""
-                    <a href="{application_link}" target="_blank">
-                        <button style="
-                            background-color:#3182ce; 
-                            color:white; 
-                            border:none; 
-                            padding:8px 16px; 
-                            border-radius:8px; 
-                            cursor:pointer;
-                            font-weight:bold;
-                        ">✅ Apply</button>
-                    </a>
-                    """, unsafe_allow_html=True)
-
-
+                    if st.button(f"✅ Apply", key=button_key):
+                        st.success(f"You chose to apply for {company_name} 🎉")
