@@ -71,9 +71,8 @@ section[data-testid="stSidebar"] {
 CSV_FILE = "internships.csv"
 try:
     df = pd.read_csv(CSV_FILE)
-    df.columns = df.columns.str.strip()
 except FileNotFoundError:
-    st.error("⚠ Default CSV not found! Put 'internships.csv' in the app folder.")
+    st.error("⚠️ Default CSV not found! Put 'internships.csv' in the app folder.")
     st.stop()
 
 # ===============================
@@ -109,6 +108,10 @@ def translate_output(text, lang):
 st.sidebar.header("🧑 Your Profile")
 
 language = st.sidebar.radio("🌐 Choose Language:", ["English", "Hindi", "Telugu"])
+
+education_input = st.sidebar.text_input(translate_ui("🎓 Your Education (optional)", language))
+education = translate_to_english(education_input, language)
+
 skills_input = st.sidebar.text_input(translate_ui("💼 Your Skills (comma-separated)", language))
 skills = translate_to_english(skills_input, language)
 
@@ -146,7 +149,6 @@ mode = translate_to_english(mode_input, language)
 def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     df_copy = df.copy()
 
-    # Filter by sector/state/district/mode
     if sector != "Any":
         df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
     if state != "Any":
@@ -154,89 +156,76 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if district != "Any":
         df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
     if mode != "Any":
-        # Since CSV has no "Internship Mode", assume online/offline in title
-        df_copy = df_copy[df_copy["Internship"].str.contains(mode, case=False, na=False)]
+        df_copy = df_copy[df_copy["Internship Mode"].str.contains(mode, case=False, na=False)]
 
     if df_copy.empty:
-        return pd.DataFrame()  # No matches
+        return pd.DataFrame()
 
-    # Strict skill matching with TF-IDF + cosine similarity
-    vectorizer = TfidfVectorizer()
-    skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
-    user_vector = vectorizer.transform([user_skills])
-    similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
-
-    # Add similarity scores as a column
-    df_copy["Match Score"] = similarity_scores
-
-    # Sort by Match Score first, then by Opportunities (high recruiting)
-    if "Opportunities" in df_copy.columns:
-        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
+    if user_skills.strip():
+        vectorizer = TfidfVectorizer()
+        skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
+        user_vector = vectorizer.transform([user_skills])
+        similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
+        df_copy["Match Score"] = similarity_scores
+        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities Count"], ascending=False)
     else:
-        df_copy = df_copy.sort_values(by="Match Score", ascending=False)
+        df_copy = df_copy.sort_values(by="Opportunities Count", ascending=False)
 
     return df_copy.head(top_n)
-import re
-
-# ===============================
-# Helper for safe Streamlit keys
-# ===============================
-def make_safe_key(idx, name):
-    name_str = re.sub(r'\W+', '', str(name))  # Remove non-alphanumeric chars
-    return f"{idx}_{name_str}"
 
 # ===============================
 # Display recommendations
 # ===============================
-def display_recommendations(results, skills, language):
+if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="recommend_button"):
+    with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
+        time.sleep(2)  # Fake loading time
+
+        results = recommend_internships(skills, sector, state, district, mode, top_n=5)
+
     if results.empty:
-        st.warning(translate_ui("⚠ Please enter your skills to get recommendations!", language))
-        return
+        st.warning(translate_ui("⚠️ No matching internships found. Try changing your filters.", language))
+    else:
+        st.subheader(translate_ui("✨ Top Recommended Internships", language))
+        for idx, row in results.iterrows():
+            company_name = row["Company Name"]
+            sector_name = translate_output(row["Sector/Industry"], language)
+            skills_req = translate_output(row["Required Skills"], language)
+            address = translate_output(row["Address"], language)
+            description = translate_output(row.get("Description", "No description available"), language)
+            district_trans = translate_output(row["District"], language)
+            state_trans = translate_output(row["State"], language)
+            last_date = translate_output(str(row.get("Last Date to Register", "Not specified")), language)
+            duration = translate_output(str(row.get("Duration", "Not specified")), language)
 
-    st.subheader(translate_ui("✨ Top Recommended Internships", language))
+            mode_class = "badge-online" if str(row["Internship Mode"]).lower() == "online" else "badge-offline"
 
-    for idx, row in results.iterrows():
-        company_name = row["Company"]
-        internship_title = row["Internship"]
-        sector_name = translate_output(row["Sector/Industry"], language)
-        skills_req = translate_output(row["Required Skills"], language)
-        address = translate_output(row["Address"], language)
-        opportunities = row["Opportunities"]
-        duration = row["Duration"]
-        district_trans = translate_output(row["District"], language)
-        state_trans = translate_output(row["State"], language)
-        internship_mode = row.get("Internship Mode", "Offline")
-        mode_class = "badge-online" if str(internship_mode).lower() == "online" else "badge-offline"
-
-        # Main card
-        st.markdown(f"""
-        <div class="internship-card">
-            <div class="internship-title">{company_name} - {internship_title}</div>
-            <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
-            <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{internship_mode}</span></div>
-            <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
-            <div class="internship-detail">🕒 Duration: {duration}</div>
-            <div class="internship-detail">📊 Opportunities: {opportunities}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Unique safe keys
-        expander_key = make_safe_key(idx, company_name) + "_exp"
-        button_key = make_safe_key(idx, company_name) + "_btn"
-
-        # Expander with details
-        with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
+            # Main card
             st.markdown(f"""
-            **Company:** {company_name}  
-            **Internship:** {internship_title}  
-            **Sector/Industry:** {sector_name}  
-            **Skills Required:** {skills_req}  
-            **Opportunities:** {opportunities}  
-            **Duration:** {duration}  
-            **Address:** {address}  
-            **District / State:** {district_trans}, {state_trans}  
-            **Internship Mode:** {internship_mode}  
-            """)
-            if st.button(f"✅ Apply", key=button_key):
-                st.success(f"You chose to apply for {company_name} 🎉")
+            <div class="internship-card">
+                <div class="internship-title">{company_name} - {sector_name}</div>
+                <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
+                <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row['Internship Mode']}</span></div>
+                <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
+            </div>
+            """, unsafe_allow_html=True)
 
+            # Unique keys
+            expander_key = f"expander_{idx}_{company_name.replace(' ', '_')}"
+            button_key = f"apply_{idx}_{company_name.replace(' ', '_')}"
+
+            with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
+                st.markdown(f"""
+                **Company Name:** {company_name}  
+                **Sector/Industry:** {sector_name}  
+                **Education (Optional):** {education if education else 'Not specified'}  
+                **Internship Mode:** {row['Internship Mode']}  
+                **Address:** {address}  
+                **District / State:** {district_trans}, {state_trans}  
+                **Opportunities:** {row['Opportunities Count']}  
+                **Skills Required:** {skills_req}  
+                **Role / Description:** {description}  
+                **Last Date to Apply:** {last_date}  
+                **Duration:** {duration}  
+                """)
+                if st.button(f"✅ Apply to {company_name}", key=button_key):
+                    st.success(f"You chose to apply for {company_name} 🎉")
