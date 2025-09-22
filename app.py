@@ -71,7 +71,6 @@ section[data-testid="stSidebar"] {
 CSV_FILE = "internships.csv"
 try:
     df = pd.read_csv(CSV_FILE)
-st.write(df.columns.tolist())  # DEBUG: see actual column names
     df.columns = df.columns.str.strip()
 except FileNotFoundError:
     st.error("⚠ Default CSV not found! Put 'internships.csv' in the app folder.")
@@ -236,4 +235,5 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     if st.button(f"✅ Apply", key=button_key):
                         st.success(f"You chose to apply for {company_name} 🎉")
                         st.markdown(f"[Click here to Apply]({application_link})", unsafe_allow_html=True)
+
 
