@@ -3,6 +3,9 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from deep_translator import GoogleTranslator
+from gtts import gTTS
+import base64
+import tempfile
 
 # ===============================
 # Page setup
@@ -24,7 +27,6 @@ except FileNotFoundError:
 # Translation helpers
 # ===============================
 def translate_ui(text, lang):
-    """Translate UI labels"""
     if lang.lower() == "english":
         return text
     try:
@@ -33,7 +35,6 @@ def translate_ui(text, lang):
         return text
 
 def translate_to_english(text, lang):
-    """Translate user input to English for matching"""
     if lang.lower() == "english" or not text.strip():
         return text
     try:
@@ -42,7 +43,6 @@ def translate_to_english(text, lang):
         return text
 
 def translate_output(text, lang):
-    """Translate output to selected language"""
     if lang.lower() == "english" or not text.strip():
         return text
     try:
@@ -51,24 +51,44 @@ def translate_output(text, lang):
         return text
 
 # ===============================
+# Text-to-Speech
+# ===============================
+def read_aloud(text, lang="en"):
+    try:
+        tts = gTTS(text=text, lang=lang[:2])
+        with tempfile.NamedTemporaryFile(delete=True) as tmp:
+            tts.save(tmp.name + ".mp3")
+            with open(tmp.name + ".mp3", "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            return f'<audio autoplay controls src="data:audio/mp3;base64,{b64}"></audio>'
+    except:
+        return ""
+
+# ===============================
 # Animated CSS
 # ===============================
 st.markdown("""
 <style>
 .stApp { background-color: #1e1e2f; color: white; }
-.internship-card { background-color: #2e2e3f; padding:20px; margin-bottom:10px; border-radius:15px; box-shadow:0 4px 12px rgba(0,0,0,0.5); transition:transform 0.3s; }
+.internship-card { background-color: #2e2e3f; padding:20px; margin-bottom:15px; border-radius:15px; box-shadow:0 4px 12px rgba(0,0,0,0.5); transition:transform 0.3s; }
 .internship-card:hover { transform: translateY(-7px) scale(1.02); }
 .internship-title { font-size:22px; font-weight:700; color:#ffcc00; margin-bottom:10px; }
 .internship-detail { font-size:16px; color:#f0f0f0; margin-bottom:6px; }
 .badge { display:inline-block; padding:5px 10px; margin-right:5px; border-radius:12px; font-size:12px; font-weight:bold; color:white; }
-.badge-online { background-color:#27ae60; } .badge-offline { background-color:#c0392b; } .badge-skill { background-color:#2980b9; }
+.badge-online { background-color:#27ae60; } 
+.badge-offline { background-color:#c0392b; } 
+.badge-remote { background-color:#8e44ad; }
+.badge-skill { background-color:#2980b9; }
+.badge-demand { background-color:#e67e22; }
+.badge-top { background-color:#16a085; }
+.badge-trend { background-color:#d35400; }
 </style>
 """, unsafe_allow_html=True)
 
 # ===============================
 # Sidebar filters
 # ===============================
-st.sidebar.header(translate_ui("🧑 Your Profile", "english"))
+st.sidebar.header("🧑 Your Profile")
 
 language = st.sidebar.radio("🌐 Choose Language:", ["English", "Hindi", "Telugu"])
 
@@ -100,10 +120,15 @@ if state != "Any":
 else:
     district = "Any"
 
+mode_input = st.sidebar.selectbox(
+    translate_ui("💻 Preferred Mode", language),
+    ["Any", "Online", "Offline", "Remote"]
+)
+
 # ===============================
 # Recommendation function
 # ===============================
-def recommend_internships(user_skills, sector, state, district, top_n=5):
+def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     df_copy = df.copy()
     if sector != "Any":
         df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
@@ -111,8 +136,11 @@ def recommend_internships(user_skills, sector, state, district, top_n=5):
         df_copy = df_copy[df_copy["State"].str.contains(state, case=False, na=False)]
     if district != "Any":
         df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
+    if mode != "Any":
+        df_copy = df_copy[df_copy["Internship Mode"].str.contains(mode, case=False, na=False)]
     if df_copy.empty:
         return pd.DataFrame()
+
     if user_skills.strip():
         vectorizer = TfidfVectorizer()
         skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
@@ -121,22 +149,40 @@ def recommend_internships(user_skills, sector, state, district, top_n=5):
         df_copy["Match Score"] = similarity_scores
         df_copy = df_copy.sort_values(by=["Match Score", "Opportunities Count"], ascending=False)
     else:
+        df_copy["Match Score"] = 0.0
         df_copy = df_copy.sort_values(by="Opportunities Count", ascending=False)
+
     return df_copy.head(top_n)
 
 # ===============================
 # Display recommendations
 # ===============================
 if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
-    results = recommend_internships(skills, sector, state, district, top_n=5)
+    results = recommend_internships(skills, sector, state, district, mode_input, top_n=5)
     if results.empty:
         st.warning(translate_ui("⚠️ No matching internships found. Try changing your filters.", language))
     else:
         st.subheader(translate_ui("✨ Top Recommended Internships", language))
-        for _, row in results.iterrows():
-            mode_class = "badge-online" if str(row["Internship Mode"]).lower() == "online" else "badge-offline"
 
-            # Translate details to desired language
+        company_counts = df["Company Name"].value_counts()
+
+        for _, row in results.iterrows():
+            mode_class = "badge-online" if str(row["Internship Mode"]).lower() == "online" else (
+                "badge-remote" if str(row["Internship Mode"]).lower() == "remote" else "badge-offline"
+            )
+
+            # Badges
+            badges = []
+            if row["Opportunities Count"] > 50:
+                badges.append('<span class="badge badge-demand">🔥 High in Demand</span>')
+            if company_counts[row["Company Name"]] > 3:
+                badges.append('<span class="badge badge-top">🏆 Top Recruiter</span>')
+            if any(skill.lower() in str(row["Required Skills"]).lower() for skill in ["python", "ml", "ai"]):
+                badges.append('<span class="badge badge-trend">⭐ Trending Skill</span>')
+
+            badge_str = " ".join(badges)
+
+            # Translate details
             company_name = row["Company Name"]
             sector_name = translate_output(row["Sector/Industry"], language)
             skills_req = translate_output(row["Required Skills"], language)
@@ -152,15 +198,15 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
                 <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
                 <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row['Internship Mode']}</span></div>
                 <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
+                <div>{badge_str}</div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Expander with full details
             with st.expander(translate_ui("📖 View Full Details", language)):
                 st.markdown(f"""
                 **Company Name:** {company_name}  
                 **Sector/Industry:** {sector_name}  
-                **Education (Optional):** {education if education else 'Not specified'}  
+                **Education:** {education if education else 'Not specified'}  
                 **Internship Mode:** {row['Internship Mode']}  
                 **Address:** {address}  
                 **District / State:** {district_trans}, {state_trans}  
@@ -168,3 +214,10 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
                 **Skills Required:** {skills_req}  
                 **Role / Description:** {description}  
                 """)
+                if st.button(f"✅ Apply to {company_name}", key=company_name+str(row["Opportunities Count"])):
+                    st.success("📩 Application submitted successfully!")
+
+            # Read aloud
+            tts_text = f"{company_name}, {sector_name}, located at {district_trans}, {state_trans}. Mode: {row['Internship Mode']}. Skills required: {skills_req}. {description}"
+            st.markdown(read_aloud(tts_text, "en"), unsafe_allow_html=True)
+
