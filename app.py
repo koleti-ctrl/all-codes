@@ -71,6 +71,7 @@ section[data-testid="stSidebar"] {
 CSV_FILE = "internships.csv"
 try:
     df = pd.read_csv(CSV_FILE)
+    df.columns = df.columns.str.strip()  # Strip any spaces in column names
 except FileNotFoundError:
     st.error("⚠️ Default CSV not found! Put 'internships.csv' in the app folder.")
     st.stop()
@@ -106,8 +107,10 @@ def translate_output(text, lang):
 # Sidebar filters
 # ===============================
 st.sidebar.header("🧑 Your Profile")
-
 language = st.sidebar.radio("🌐 Choose Language:", ["English", "Hindi", "Telugu"])
+
+education_input = st.sidebar.text_input(translate_ui("🎓 Your Education (optional)", language))
+education = translate_to_english(education_input, language)
 
 skills_input = st.sidebar.text_input(translate_ui("💼 Your Skills (comma-separated)", language))
 skills = translate_to_english(skills_input, language)
@@ -141,7 +144,7 @@ mode_input = st.sidebar.selectbox(
 mode = translate_to_english(mode_input, language)
 
 # ===============================
-# Recommendation function (AI-powered based on skills)
+# Recommendation function
 # ===============================
 def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if not user_skills.strip():
@@ -156,21 +159,19 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if district != "Any":
         df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
     if mode != "Any":
-        df_copy = df_copy[df_copy["Internship"].str.contains(mode, case=False, na=False)]  # Replace with correct mode column
+        df_copy = df_copy[df_copy["Internship"].str.contains(mode, case=False, na=False)]  # Assuming 'Internship' column describes mode
 
     if df_copy.empty:
         return pd.DataFrame()
 
-    # AI-powered skill matching
+    # Skills similarity
     vectorizer = TfidfVectorizer()
     skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
     user_vector = vectorizer.transform([user_skills])
     similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
     df_copy["Match Score"] = similarity_scores
 
-    # Sort by highest skill match
     df_copy = df_copy.sort_values(by="Match Score", ascending=False)
-
     return df_copy.head(top_n)
 
 # ===============================
@@ -178,10 +179,10 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
 # ===============================
 if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="recommend_button"):
     if not skills.strip():
-        st.warning(translate_ui("⚠️ Please enter your skills to get recommendations.", language))
+        st.warning(translate_ui("⚠️ Please enter your skills to get recommendations!", language))
     else:
         with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
-            time.sleep(2)  # Optional loading effect
+            time.sleep(2)
             results = recommend_internships(skills, sector, state, district, mode, top_n=5)
 
         if results.empty:
@@ -190,14 +191,15 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
             st.subheader(translate_ui("✨ Top Recommended Internships", language))
             for idx, row in results.iterrows():
                 company_name = row["Company"]
+                internship_name = row["Internship"]
                 sector_name = translate_output(row["Sector/Industry"], language)
                 skills_req = translate_output(row["Required Skills"], language)
                 address = translate_output(row["Address"], language)
-                internship_name = translate_output(row["Internship"], language)
+                description = translate_output(row.get("Description", "No description available"), language)
                 district_trans = translate_output(row["District"], language)
                 state_trans = translate_output(row["State"], language)
+                last_date = translate_output(str(row.get("Last Date to Register", "Not specified")), language)
                 duration = translate_output(str(row.get("Duration", "Not specified")), language)
-                app_link = row.get("Application Link", "#")
 
                 mode_class = "badge-online" if "online" in internship_name.lower() else "badge-offline"
 
@@ -207,12 +209,13 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     <div class="internship-title">{company_name} - {internship_name} ({sector_name})</div>
                     <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
                     <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{internship_name}</span></div>
-                    <div class="internship-detail">💼 Skills: 
-                        {" ".join([f'<span class="badge badge-skill">{skill.strip()}</span>' for skill in skills_req.split(",")])}
-                    </div>
+                    <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
                     <div class="internship-detail">🕒 Duration: {duration}</div>
+                    <div class="internship-detail">📅 Last Date: {last_date}</div>
+                    <div class="internship-detail">🏢 Address: {address}</div>
+                    <div class="internship-detail">📝 Role / Description: {description}</div>
                     <br>
-                    <a href="{app_link}" target="_blank">
+                    <form action="{row.get('Application Link','#')}" method="get" target="_blank">
                         <button style="
                             background-color:#3182ce; 
                             color:white; 
@@ -222,6 +225,6 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                             cursor:pointer;
                             font-weight:bold;
                         ">✅ Apply</button>
-                    </a>
+                    </form>
                 </div>
                 """, unsafe_allow_html=True)
