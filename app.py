@@ -3,9 +3,6 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from deep_translator import GoogleTranslator
-from gtts import gTTS
-import base64
-import tempfile
 
 # ===============================
 # Page setup
@@ -51,21 +48,7 @@ def translate_output(text, lang):
         return text
 
 # ===============================
-# Text-to-Speech
-# ===============================
-def read_aloud(text, lang="en"):
-    try:
-        tts = gTTS(text=text, lang=lang[:2])
-        with tempfile.NamedTemporaryFile(delete=True) as tmp:
-            tts.save(tmp.name + ".mp3")
-            with open(tmp.name + ".mp3", "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-            return f'<audio autoplay controls src="data:audio/mp3;base64,{b64}"></audio>'
-    except:
-        return ""
-
-# ===============================
-# Animated CSS
+# CSS for attractive cards
 # ===============================
 st.markdown("""
 <style>
@@ -163,7 +146,6 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
         st.warning(translate_ui("⚠️ No matching internships found. Try changing your filters.", language))
     else:
         st.subheader(translate_ui("✨ Top Recommended Internships", language))
-
         company_counts = df["Company Name"].value_counts()
 
         for _, row in results.iterrows():
@@ -202,6 +184,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
             </div>
             """, unsafe_allow_html=True)
 
+            # Expander with Apply button
             with st.expander(translate_ui("📖 View Full Details", language)):
                 st.markdown(f"""
                 **Company Name:** {company_name}  
@@ -217,7 +200,4 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language)):
                 if st.button(f"✅ Apply to {company_name}", key=company_name+str(row["Opportunities Count"])):
                     st.success("📩 Application submitted successfully!")
 
-            # Read aloud
-            tts_text = f"{company_name}, {sector_name}, located at {district_trans}, {state_trans}. Mode: {row['Internship Mode']}. Skills required: {skills_req}. {description}"
-            st.markdown(read_aloud(tts_text, "en"), unsafe_allow_html=True)
 
