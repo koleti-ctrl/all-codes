@@ -228,5 +228,4 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                 **Duration:** {duration}  
                 """)
                 if st.button(f"✅ Apply to {company_name}", key=button_key):
-                    st.success(f"You chose to apply for {company_name} 🎉")tton(f"✅ Apply to {company_name}", key=button_key):
                     st.success(f"You chose to apply for {company_name} 🎉")
