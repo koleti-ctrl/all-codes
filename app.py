@@ -1,9 +1,10 @@
+import re
+import time
 import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from deep_translator import GoogleTranslator
-import time
 
 # ===============================
 # Page setup
@@ -71,6 +72,11 @@ section[data-testid="stSidebar"] {
 CSV_FILE = "internships.csv"
 try:
     df = pd.read_csv(CSV_FILE)
+    # Defensive: replace NaN with empty strings to avoid translator / widget problems
+    df = df.fillna('')
+    # Ensure Opportunities Count is numeric for proper sorting
+    if "Opportunities Count" in df.columns:
+        df["Opportunities Count"] = pd.to_numeric(df["Opportunities Count"], errors='coerce').fillna(0).astype(int)
 except FileNotFoundError:
     st.error("⚠️ Default CSV not found! Put 'internships.csv' in the app folder.")
     st.stop()
@@ -83,24 +89,31 @@ def translate_ui(text, lang):
         return text
     try:
         return GoogleTranslator(source='auto', target=lang[:2].lower()).translate(text)
-    except:
+    except Exception:
         return text
 
 def translate_to_english(text, lang):
-    if lang.lower() == "english" or not text.strip():
+    if lang.lower() == "english" or not str(text).strip():
         return text
     try:
-        return GoogleTranslator(source=lang[:2].lower(), target='en').translate(text)
-    except:
+        return GoogleTranslator(source=lang[:2].lower(), target='en').translate(str(text))
+    except Exception:
         return text
 
 def translate_output(text, lang):
-    if lang.lower() == "english" or not text.strip():
+    if lang.lower() == "english" or not str(text).strip():
         return text
     try:
-        return GoogleTranslator(source='auto', target=lang[:2].lower()).translate(text)
-    except:
+        return GoogleTranslator(source='auto', target=lang[:2].lower()).translate(str(text))
+    except Exception:
         return text
+
+# ===============================
+# Helper: sanitize keys for Streamlit widgets
+# ===============================
+def sanitize_key(s):
+    # replace any non-word characters with underscore
+    return re.sub(r'\W+', '_', str(s))
 
 # ===============================
 # Sidebar filters
@@ -117,13 +130,13 @@ skills = translate_to_english(skills_input, language)
 
 sector_input = st.sidebar.selectbox(
     translate_ui("🏢 Preferred Sector", language),
-    options=["Any"] + sorted(df["Sector/Industry"].dropna().unique())
+    options=["Any"] + sorted(df["Sector/Industry"].dropna().unique().tolist())
 )
 sector = translate_to_english(sector_input, language)
 
 state_input = st.sidebar.selectbox(
     translate_ui("🌍 Preferred State", language),
-    options=["Any"] + sorted(df["State"].dropna().unique())
+    options=["Any"] + sorted(df["State"].dropna().unique().tolist())
 )
 state = translate_to_english(state_input, language)
 
@@ -161,15 +174,24 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if df_copy.empty:
         return pd.DataFrame()
 
-    if user_skills.strip():
+    if str(user_skills).strip():
         vectorizer = TfidfVectorizer()
         skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
         user_vector = vectorizer.transform([user_skills])
         similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
+        df_copy = df_copy.copy()  # ensure we're working with a copy
         df_copy["Match Score"] = similarity_scores
-        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities Count"], ascending=False)
+        # sort by match score, then opportunities
+        if "Opportunities Count" in df_copy.columns:
+            df_copy = df_copy.sort_values(by=["Match Score", "Opportunities Count"], ascending=False)
+        else:
+            df_copy = df_copy.sort_values(by=["Match Score"], ascending=False)
     else:
-        df_copy = df_copy.sort_values(by="Opportunities Count", ascending=False)
+        # just sort by opportunities if no skills provided
+        if "Opportunities Count" in df_copy.columns:
+            df_copy = df_copy.sort_values(by="Opportunities Count", ascending=False)
+        else:
+            df_copy = df_copy
 
     return df_copy.head(top_n)
 
@@ -178,7 +200,7 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
 # ===============================
 if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="recommend_button"):
     with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
-        time.sleep(2)  # Fake loading time
+        time.sleep(1)  # short friendly pause
 
         results = recommend_internships(skills, sector, state, district, mode, top_n=5)
 
@@ -187,41 +209,42 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
     else:
         st.subheader(translate_ui("✨ Top Recommended Internships", language))
         for idx, row in results.iterrows():
-            company_name = row["Company Name"]
-            sector_name = translate_output(row["Sector/Industry"], language)
-            skills_req = translate_output(row["Required Skills"], language)
-            address = translate_output(row["Address"], language)
+            company_name = row.get("Company Name", "")
+            sector_name = translate_output(row.get("Sector/Industry", ""), language)
+            skills_req = translate_output(row.get("Required Skills", ""), language)
+            address = translate_output(row.get("Address", ""), language)
             description = translate_output(row.get("Description", "No description available"), language)
-            district_trans = translate_output(row["District"], language)
-            state_trans = translate_output(row["State"], language)
+            district_trans = translate_output(row.get("District", ""), language)
+            state_trans = translate_output(row.get("State", ""), language)
             last_date = translate_output(str(row.get("Last Date to Register", "Not specified")), language)
             duration = translate_output(str(row.get("Duration", "Not specified")), language)
 
-            mode_class = "badge-online" if str(row["Internship Mode"]).lower() == "online" else "badge-offline"
+            mode_class = "badge-online" if str(row.get("Internship Mode", "")).lower() == "online" else "badge-offline"
 
             # Main card
             st.markdown(f"""
             <div class="internship-card">
                 <div class="internship-title">{company_name} - {sector_name}</div>
                 <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
-                <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row['Internship Mode']}</span></div>
+                <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row.get('Internship Mode', '')}</span></div>
                 <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Unique keys
-            expander_key = f"expander_{idx}_{company_name.replace(' ', '_')}"
-            button_key = f"apply_{idx}_{company_name.replace(' ', '_')}"
+            # Unique sanitized keys
+            safe_name = sanitize_key(f"{company_name}_{idx}")
+            button_key = f"apply_{safe_name}"
 
-            with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
+            # NOTE: some Streamlit versions don't accept 'key' on expander; avoid passing key here
+            with st.expander(translate_ui("📖 View Full Details", language), expanded=False):
                 st.markdown(f"""
                 **Company Name:** {company_name}  
                 **Sector/Industry:** {sector_name}  
                 **Education (Optional):** {education if education else 'Not specified'}  
-                **Internship Mode:** {row['Internship Mode']}  
+                **Internship Mode:** {row.get('Internship Mode', '')}  
                 **Address:** {address}  
                 **District / State:** {district_trans}, {state_trans}  
-                **Opportunities:** {row['Opportunities Count']}  
+                **Opportunities:** {row.get('Opportunities Count', '')}  
                 **Skills Required:** {skills_req}  
                 **Role / Description:** {description}  
                 **Last Date to Apply:** {last_date}  
