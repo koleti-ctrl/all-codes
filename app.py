@@ -204,7 +204,9 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
 
         results = recommend_internships(skills, sector, state, district, mode, top_n=5)
 
-    if results.empty:
+    if not str(skills).strip():
+        st.info(translate_ui("ℹ️ Please enter at least one skill to get better recommendations.", language))
+    elif results.empty:
         st.warning(translate_ui("⚠️ No matching internships found. Try changing your filters.", language))
     else:
         st.subheader(translate_ui("✨ Top Recommended Internships", language))
