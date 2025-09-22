@@ -147,11 +147,13 @@ mode = translate_to_english(mode_input, language)
 # ===============================
 # Recommendation function with weighted scoring
 # ===============================
-def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
+def recommend_internships(user_skills, education, sector, state, district, mode, top_n=5):
     if not user_skills.strip():
         return pd.DataFrame()  # Must provide skills
 
     df_copy = df.copy()
+
+    # Filters
     if sector != "Any":
         df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
     if state != "Any":
@@ -159,7 +161,7 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if district != "Any":
         df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
     if mode != "Any":
-        df_copy = df_copy[df_copy["Internship Mode"].str.contains(mode, case=False, na=False)]
+        df_copy = df_copy[df_copy["Internship"].str.contains(mode, case=False, na=False)]
 
     if df_copy.empty:
         return pd.DataFrame()
@@ -170,21 +172,36 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     user_vector = vectorizer.transform([user_skills])
     similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
 
-    # Weighted scoring
+    # Initialize Match Score with skills weight
     df_copy["Match Score"] = similarity_scores * 0.6  # Skills weight 60%
-    # Bonus weight for matching education
-    if education.strip():
-        df_copy["Match Score"] += df_copy.get("Education", "").apply(lambda x: 0.1 if education.lower() in str(x).lower() else 0)
-    # Bonus weight for sector, state, district matches
+
+    # Bonus weight for education
+    if education.strip() and "Education" in df_copy.columns:
+        df_copy["Match Score"] += df_copy["Education"].apply(
+            lambda x: 0.1 if education.lower() in str(x).lower() else 0
+        )
+
+    # Bonus weights for sector, state, district, mode
     if sector != "Any":
-        df_copy["Match Score"] += 0.1
+        df_copy["Match Score"] += df_copy["Sector/Industry"].apply(
+            lambda x: 0.1 if sector.lower() in str(x).lower() else 0
+        )
     if state != "Any":
-        df_copy["Match Score"] += 0.1
+        df_copy["Match Score"] += df_copy["State"].apply(
+            lambda x: 0.05 if state.lower() in str(x).lower() else 0
+        )
     if district != "Any":
-        df_copy["Match Score"] += 0.1
+        df_copy["Match Score"] += df_copy["District"].apply(
+            lambda x: 0.05 if district.lower() in str(x).lower() else 0
+        )
+    if mode != "Any":
+        df_copy["Match Score"] += df_copy["Internship"].apply(
+            lambda x: 0.1 if mode.lower() in str(x).lower() else 0
+        )
 
     # Sort by Match Score + Opportunities
-    df_copy = df_copy.sort_values(by=["Match Score", "Opportunities Count"], ascending=False)
+    df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
+
     return df_copy.head(top_n)
 
 # ===============================
@@ -256,3 +273,4 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     """)
                     if st.button(f"✅ Apply to {company_name}", key=button_key):
                         st.success(f"You chose to apply for {company_name} 🎉")
+
