@@ -29,7 +29,7 @@ section[data-testid="stSidebar"] {
     color: white;
 }
 .internship-card {
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.75);
     padding:20px;
     margin-bottom:15px;
     border-radius:15px;
@@ -40,24 +40,28 @@ section[data-testid="stSidebar"] {
     transform: translateY(-7px) scale(1.02);
 }
 .internship-title {
-    font-size:22px;
-    font-weight:700;
+    font-size:24px;
+    font-weight:800;
     color:#ffcc00;
     margin-bottom:10px;
+    text-shadow: 1px 1px 4px #000000;
 }
 .internship-detail {
-    font-size:16px;
+    font-size:18px;
+    font-weight:600;
     color:#f0f0f0;
     margin-bottom:6px;
+    text-shadow: 1px 1px 3px #000000;
 }
 .badge {
     display:inline-block;
-    padding:5px 10px;
+    padding:6px 12px;
     margin-right:5px;
     border-radius:12px;
-    font-size:12px;
+    font-size:14px;
     font-weight:bold;
     color:white;
+    text-shadow: 1px 1px 2px #000000;
 }
 .badge-online { background-color:#27ae60; }
 .badge-offline { background-color:#c0392b; }
@@ -245,3 +249,4 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                 """)
                 if st.button(f"✅ Apply to {company_name}", key=button_key):
                     st.success(f"You chose to apply for {company_name} 🎉")
+
