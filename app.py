@@ -177,55 +177,60 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
 # Display recommendations
 # ===============================
 if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="recommend_button"):
-    with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
-        time.sleep(2)  # Fake loading time
-
-        results = recommend_internships(skills, sector, state, district, mode, top_n=5)
-
-    if results.empty:
-        st.warning(translate_ui("⚠ No matching internships found. Try changing your filters.", language))
+    if not skills.strip():
+        st.warning(translate_ui("⚠ Please enter your skills to get recommendations!", language))
     else:
-        st.subheader(translate_ui("✨ Top Recommended Internships", language))
-        for idx, row in results.iterrows():
-            company_name = row["Company Name"]
-            sector_name = translate_output(row["Sector/Industry"], language)
-            skills_req = translate_output(row["Required Skills"], language)
-            address = translate_output(row["Address"], language)
-            description = translate_output(row.get("Description", "No description available"), language)
-            district_trans = translate_output(row["District"], language)
-            state_trans = translate_output(row["State"], language)
-            last_date = translate_output(str(row.get("Last Date to Register", "Not specified")), language)
-            duration = translate_output(str(row.get("Duration", "Not specified")), language)
+        with st.spinner("⚡ Finding the best internships for you... Please wait! 🚀"):
+            time.sleep(2)  # Fake loading time
+            results = recommend_internships(skills, sector, state, district, mode, top_n=5)
 
-            mode_class = "badge-online" if str(row["Internship Mode"]).lower() == "online" else "badge-offline"
+        if results.empty:
+            st.warning(translate_ui("⚠ No matching internships found. Try changing your filters.", language))
+        else:
+            st.subheader(translate_ui("✨ Top Recommended Internships", language))
+            for idx, row in results.iterrows():
+                company_name = row["Company"]
+                internship_title = row["Internship"]
+                sector_name = translate_output(row["Sector/Industry"], language)
+                skills_req = translate_output(row["Required Skills"], language)
+                address = translate_output(row["Address"], language)
+                opportunities = row["Opportunities"]
+                duration = row["Duration"]
+                last_date = row.get("Last Date to Register", "Not specified")  # Optional
+                district_trans = translate_output(row["District"], language)
+                state_trans = translate_output(row["State"], language)
+                application_link = row.get("Application Link", "#")
 
-            # Main card
-            st.markdown(f"""
-            <div class="internship-card">
-                <div class="internship-title">{company_name} - {sector_name}</div>
-                <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
-                <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row['Internship Mode']}</span></div>
-                <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
-            </div>
-            """, unsafe_allow_html=True)
+                mode_class = "badge-online" if str(row.get("Internship Mode", "Offline")).lower() == "online" else "badge-offline"
 
-            # Unique keys
-            expander_key = f"expander_{idx}{company_name.replace(' ', '')}"
-            button_key = f"apply_{idx}{company_name.replace(' ', '')}"
-
-            with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
+                # Main card
                 st.markdown(f"""
-                *Company Name:* {company_name}  
-                *Sector/Industry:* {sector_name}  
-                *Education (Optional):* {education if education else 'Not specified'}  
-                *Internship Mode:* {row['Internship Mode']}  
-                *Address:* {address}  
-                *District / State:* {district_trans}, {state_trans}  
-                *Opportunities:* {row['Opportunities Count']}  
-                *Skills Required:* {skills_req}  
-                *Role / Description:* {description}  
-                *Last Date to Apply:* {last_date}  
-                *Duration:* {duration}  
-                """)
-                if st.button(f"✅ Apply to {company_name}", key=button_key):
-                    st.success(f"You chose to apply for {company_name} 🎉")
+                <div class="internship-card">
+                    <div class="internship-title">{company_name} - {internship_title}</div>
+                    <div class="internship-detail">📍 {district_trans}, {state_trans}</div>
+                    <div class="internship-detail">📝 Mode: <span class="badge {mode_class}">{row.get('Internship Mode', 'Offline')}</span></div>
+                    <div class="internship-detail">💼 Skills: <span class="badge badge-skill">{skills_req}</span></div>
+                    <div class="internship-detail">🕒 Duration: {duration}</div>
+                    <div class="internship-detail">📅 Last Date: {last_date}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Unique keys (index-based to avoid duplicates)
+                expander_key = f"expander_{idx}"
+                button_key = f"apply_{idx}"
+
+                with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
+                    st.markdown(f"""
+                    **Company:** {company_name}  
+                    **Internship:** {internship_title}  
+                    **Sector/Industry:** {sector_name}  
+                    **Skills Required:** {skills_req}  
+                    **Opportunities:** {opportunities}  
+                    **Duration:** {duration}  
+                    **Last Date to Apply:** {last_date}  
+                    **Address:** {address}  
+                    **District / State:** {district_trans}, {state_trans}  
+                    """)
+                    if st.button(f"✅ Apply", key=button_key):
+                        st.success(f"You chose to apply for {company_name} 🎉")
+                        st.markdown(f"[Click here to Apply]({application_link})", unsafe_allow_html=True)
