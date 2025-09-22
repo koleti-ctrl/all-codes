@@ -144,12 +144,9 @@ mode = translate_to_english(mode_input, language)
 # Recommendation function
 # ===============================
 def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
-    if not user_skills.strip():
-        return pd.DataFrame()  # Skills are required
-
     df_copy = df.copy()
 
-    # Apply filters
+    # Filter by sector/state/district/mode
     if sector != "Any":
         df_copy = df_copy[df_copy["Sector/Industry"].str.contains(sector, case=False, na=False)]
     if state != "Any":
@@ -157,31 +154,28 @@ def recommend_internships(user_skills, sector, state, district, mode, top_n=5):
     if district != "Any":
         df_copy = df_copy[df_copy["District"].str.contains(district, case=False, na=False)]
     if mode != "Any":
-        df_copy = df_copy[df_copy["Internship Mode"].str.contains(mode, case=False, na=False)]
+        # Since CSV has no "Internship Mode", assume online/offline in title
+        df_copy = df_copy[df_copy["Internship"].str.contains(mode, case=False, na=False)]
 
     if df_copy.empty:
-        return pd.DataFrame()
+        return pd.DataFrame()  # No matches
 
-    # Strict skill matching using TF-IDF
+    # Strict skill matching with TF-IDF + cosine similarity
     vectorizer = TfidfVectorizer()
     skill_matrix = vectorizer.fit_transform(df_copy["Required Skills"].fillna("").astype(str))
     user_vector = vectorizer.transform([user_skills])
     similarity_scores = cosine_similarity(user_vector, skill_matrix).flatten()
-    
+
+    # Add similarity scores as a column
     df_copy["Match Score"] = similarity_scores
 
-    # Sort by existing columns only
-    sort_columns = []
-    if "Match Score" in df_copy.columns:
-        sort_columns.append("Match Score")
+    # Sort by Match Score first, then by Opportunities (high recruiting)
     if "Opportunities" in df_copy.columns:
-        sort_columns.append("Opportunities")
-
-    if sort_columns:
-        df_copy = df_copy.sort_values(by=sort_columns, ascending=False)
+        df_copy = df_copy.sort_values(by=["Match Score", "Opportunities"], ascending=False)
+    else:
+        df_copy = df_copy.sort_values(by="Match Score", ascending=False)
 
     return df_copy.head(top_n)
-
 import re
 
 # ===============================
@@ -245,3 +239,4 @@ def display_recommendations(results, skills, language):
             """)
             if st.button(f"✅ Apply", key=button_key):
                 st.success(f"You chose to apply for {company_name} 🎉")
+
