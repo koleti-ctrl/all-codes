@@ -190,16 +190,16 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
         else:
             st.subheader(translate_ui("✨ Top Recommended Internships", language))
             for idx, row in results.iterrows():
-                company_name = row["Company"]
-                internship_title = row["Internship"]
-                sector_name = translate_output(row["Sector/Industry"], language)
-                skills_req = translate_output(row["Required Skills"], language)
-                address = translate_output(row["Address"], language)
-                opportunities = row["Opportunities"]
-                duration = row["Duration"]
-                last_date = row.get("Last Date to Register", "Not specified")  # Optional
-                district_trans = translate_output(row["District"], language)
-                state_trans = translate_output(row["State"], language)
+                company_name = row.get("Company", "Not specified")
+                internship_title = row.get("Internship", "Not specified")
+                sector_name = translate_output(row.get("Sector/Industry", ""), language)
+                skills_req = translate_output(row.get("Required Skills", ""), language)
+                address = translate_output(row.get("Address", ""), language)
+                opportunities = row.get("Opportunities", "N/A")
+                duration = row.get("Duration", "N/A")
+                last_date = row.get("Last Date to Register", "Not specified")  
+                district_trans = translate_output(row.get("District", ""), language)
+                state_trans = translate_output(row.get("State", ""), language)
                 application_link = row.get("Application Link", "#")
 
                 mode_class = "badge-online" if str(row.get("Internship Mode", "Offline")).lower() == "online" else "badge-offline"
@@ -218,8 +218,7 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
 
                 # Unique keys (index-based to avoid duplicates)
                 expander_key = f"expander_{idx}"
-                button_key = f"apply_{idx}"
-
+                
                 with st.expander(translate_ui("📖 View Full Details", language), expanded=False, key=expander_key):
                     st.markdown(f"""
                     **Company:** {company_name}  
@@ -232,8 +231,19 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                     **Address:** {address}  
                     **District / State:** {district_trans}, {state_trans}  
                     """)
-                    if st.button(f"✅ Apply", key=button_key):
-                        st.success(f"You chose to apply for {company_name} 🎉")
-                        st.markdown(f"[Click here to Apply]({application_link})", unsafe_allow_html=True)
+                    # Apply button opens the application link directly
+                    st.markdown(f"""
+                    <a href="{application_link}" target="_blank">
+                        <button style="
+                            background-color:#3182ce; 
+                            color:white; 
+                            border:none; 
+                            padding:8px 16px; 
+                            border-radius:8px; 
+                            cursor:pointer;
+                            font-weight:bold;
+                        ">✅ Apply</button>
+                    </a>
+                    """, unsafe_allow_html=True)
 
 
