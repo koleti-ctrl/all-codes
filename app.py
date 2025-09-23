@@ -18,15 +18,11 @@ st.title("🤖 SkillSync – AI-powered Internship Recommender")
 st.markdown("""
 <style>
 .stApp {
-    background-image: url('https://images.unsplash.com/photo-1504384308090-c894fdcc538d');
-    background-size: cover;
-    background-attachment: fixed;
+    background-color: #0e1117;  /* clean dark background */
     color: white;
 }
 section[data-testid="stSidebar"] {
-    background-image: url('https://images.unsplash.com/photo-1518770660439-4636190af475');
-    background-size: cover;
-    background-attachment: fixed;
+    background-color: #1a1d23;  /* subtle sidebar contrast */
     color: white;
 }
 .internship-card {
@@ -254,3 +250,4 @@ if st.sidebar.button(translate_ui("🔍 Recommend Internships", language), key="
                 """)
                 if st.button(f"✅ Apply to {company_name}", key=button_key):
                     st.success(f"You chose to apply for {company_name} 🎉")
+
